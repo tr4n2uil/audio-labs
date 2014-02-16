@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!--
+/**
+ *  audio app HTML file
+ *
+ *  Vibhaj Rajan <vibhaj8@gmail.com>
+ *  2014 HTML Labs <http://vibhaj.com/labs/>
+ *
+ *  Licensed under MIT License 
+ *  http://www.opensource.org/licenses/mit-license.php
+ *
+**/
+-->
+
+<html>
+    <head>
+        <title>audio &mdash; html labs &mdash; vibhaj.com</title>
+        <link rel='stylesheet', href='//netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css' >
+        <style type="text/css">
+            .round {
+                border-radius: 1em;
+                -moz-border-radius: 1em;
+                -webkit-border-radius: 1em;
+                width: 2em;
+                word-wrap: break-word;
+            }
+            .status {
+                margin: 3em 0;
+            }
+
+            .body {
+                margin: auto;
+            }
+
+            .wrap {
+                padding: 0 15px;
+            }
+        </style>
+        <script type='text/javascript' src='//code.jquery.com/jquery-1.10.2.min.js'></script>
+        <script type='text/javascript' src='//netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js'></script>
+        <!--<script type='text/javascript' src='//connect.facebook.net/en_US/all.js'></script>-->
+        <script type="text/javascript" src="//timeago.yarp.com/jquery.timeago.js"></script>
+        <script type="text/javascript" src="//vibhaj.com/ui/frontend.js/frontend.js"></script>
+        <script type="text/javascript">
+            $( document ).ready( function(){
+                window.fix_placeholder();
+
+                window.base_wide = 50;
+                window.base_divider = 40;
+                window.base_subpart = 30;
+                window.update_viewport();
+                $( window ).resize( window.update_viewport );
+            } );
+        </script>
+    </head>
+
+    <body>
+        <div id="fb-root"></div>
+        
+        <div style="border-bottom: solid 1px #ddd; background-color: #efefef; padding-top: 0.5em">
+            <div class="body"><div class="wrap">
+                <div><a href="" style="color: black; font-size: 3em;"><strong>audio labs</strong></a><div class="pull-right" style="margin-top: 1.2em; text-align: right;">
+                    <div><!--<fb:login-button autologoutlink="true" show-faces="false" width="150" max-rows="0" perms="email,read_stream,user_about_me,user_friends,user_likes,friends_status,friends_photos"></fb:login-button>--></div>
+                </div></div>
+                <div style="font-size: 0.8em; font-style: italic; margin-top: -0.8em; margin-bottom: 1.5em;">Enjoy the genesis of music by repeating you own audio.</div>
+                <div style="clear: both;"></div>
+            </div></div>
+        </div>
+
+        <div class="body"><div class="wrap">
+            <div id="main-ui">
+
+                <div style="margin: 2em 0 0;">
+                    <input class="form-control" type="file" name="file" id="load-file" style="display: none;"/>
+                    <button class="btn btn-primary" onclick="return $('#load-file').click();">Open</button> &nbsp; <input class="form-control" type="text" name="interval" value="550" id="interval-field" size="5" style="display: inline-block; width: 30%;"/>
+                    <button class="btn btn-success" onclick="playSound()" disabled>Play</button>
+                    <button class="btn btn-danger" onclick="stopSound()" disabled>Stop</button>
+                </div>
+
+            </div>
+            <div id="signal-ui" style="margin: 1em 0;"></div>
+        </div></div>
+    </body>
+
+    <script type="text/javascript">
+        $( document ).ready(function(){
+
+            UI = {
+                canvas: $( '#main-ui' ),
+                signal: $( '#signal-ui' ),
+                processing: false,
+                now: Math.round(new Date().getTime()/1000),
+
+                clean: function(){
+                    this.processing = false;
+                    this.canvas.html('');
+                },
+
+                render: function(type){
+                    var type = type || 'pages';
+                    var that = this;
+                    that.clean();
+
+                    document.cookie = 'type=' + type;
+
+                    
+                },
+
+                scroll: function(callback){
+                    var that = this;
+                    jQuery( document ).unbind( 'scroll' );
+                    
+                    if( callback ){
+                        jQuery( document ).bind( 'scroll', function( e ){
+                            if ( that.processing || false )
+                                return false;
+
+                            if ( $( window ).scrollTop() >= $( document ).height() - $( window ).height() - 5000 ){
+                                that.processing = true;
+                                callback();
+                            }
+                        } );
+
+                        if ( $( window ).scrollTop() >= $( document ).height() - $( window ).height() - 5000 ){
+                            that.processing = true;
+                            callback();
+                        }
+                    }
+                },
+            }
+
+            /* init the FB JS SDK
+            FB.init({
+                appId      : ( window.location.hostname == 'localhost' ) ? '289641444493947' : '565864393500012',
+                status     : true,
+                xfbml      : true
+            });
+
+            /*
+            FB.Event.subscribe('auth.authResponseChange', function(response) {
+                if (response.status === 'connected') {
+                    //testAPI(response);
+                    var type = 'pages';
+                    if(document.cookie || false){
+                        //console.log(document.cookie);
+                        var all = document.cookie.split(';');
+                        var fin = [];
+                        for (var i in all){
+                            var parts = all[i].trim().split('=');
+                            if(parts[0] == 'type'){
+                                type = parts[1];
+                                break;
+                            }
+                        }
+                    }
+
+                    UI.render(type);
+                //} else if (response.status === 'not_authorized') {
+                //    FB.login(function(){}, {scope: 'email, user_about_me, user_friends'});
+                // FB.api({ method: 'Auth.revokeAuthorization' }
+                } else {
+                    UI.clean();
+                    //FB.login(cb, {scope: 'email,read_stream,user_about_me,user_friends'});
+                }
+            });*/
+
+            window.context;
+            window.source1 = null;
+            window.source2 = null;
+            window.audioBuffer = null;
+            window.playing = false;
+
+            window.stopSound = function(){
+                if (source1) {
+                    source1.noteOff(0);
+                    source1 = null;
+                }
+                if (source2) {
+                    source2.noteOff(0);
+                    source2 = null;
+                }
+            }
+
+            window.playStream = function( source ){
+                source.buffer = audioBuffer;
+                source.loop = false;
+                source.connect( context.destination );
+                source.noteOn(0); // Play immediately.
+            }
+
+            window.playSound = function(){
+                if( !playing ){
+                    // source is global so we can call .noteOff() later.
+                    stopSound();
+                    
+                    window.source1 = context.createBufferSource();
+                    playStream( window.source1 );
+
+                    window.setTimeout( function(){
+                        window.source2 = context.createBufferSource();
+                        playStream( window.source2 );
+                    }, Number( $( '#interval-field' ).val() ) );
+                }
+            }
+
+            window.initSound = function( arrayBuffer ){
+                context.decodeAudioData( arrayBuffer, function( buffer ) {
+                    // audioBuffer is global to reuse the decoded audio later.
+                    audioBuffer = buffer;
+                    var buttons = document.querySelectorAll('button');
+                    buttons[1].disabled = false;
+                    buttons[2].disabled = false;
+                    $( '#signal-ui' ).html( '' );
+                }, function(e) {
+                    console.log('Error decoding file', e);
+                }); 
+            }
+
+            // User selects file, read it as an ArrayBuffer and pass to the API.
+            var fileInput = document.querySelector( 'input[type="file"]' );
+            fileInput.addEventListener( 'change', function( e ){
+                $( '#signal-ui' ).html( 'Loading Music.  Please wait ...' );
+                var reader = new FileReader();
+                reader.onload = function( e ){
+                    initSound( this.result );
+                };
+                reader.readAsArrayBuffer( this.files[ 0 ] );
+            }, false );
+
+            // Load file from a URL as an ArrayBuffer.
+            // Example: loading via xhr2: loadSoundFile('sounds/test.mp3');
+            function loadSoundFile( url ){
+                var xhr = new XMLHttpRequest();
+                xhr.open( 'GET', url, true );
+                xhr.responseType = 'arraybuffer';
+                xhr.onload = function( e ){
+                    initSound( this.response ); // this.response is an ArrayBuffer.
+                };
+                xhr.send();
+            }
+
+
+            window.addEventListener('load', init, false);
+            
+            function init() {
+                try {
+                    // Fix up for prefixing
+                    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                    context = new AudioContext();
+                }
+                catch(e) {
+                    alert('Web Audio API is not supported in this browser');
+                }
+            }
+        });
+    </script>
+
+    <script>
+        /*(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-46927105-1', 'one-last.com');
+        ga('send', 'pageview');*/
+    </script>
+</html>
